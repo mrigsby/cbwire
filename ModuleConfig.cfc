@@ -78,7 +78,19 @@ component {
              * You can also provide your own custom implementation that implements
              * cbwire.models.interfaces.ICSRFStorage
              */
-            "csrfService": "SessionCSRFStorage@cbwire"
+            "csrfService": "SessionCSRFStorage@cbwire",
+            /**
+             * Optional WebSocket transport for component updates.
+             * Default enabled=false keeps classic AJAX behavior everywhere.
+             * When enabled, requires SocketBox plus CommandBox (WS on) or
+             * BoxLang MiniServer; otherwise CBWIRE logs and stays on HTTP.
+             */
+            "transport": {
+                "enabled"      : false,
+                "websocketUri" : "/ws",
+                "timeoutMs"    : 5000,
+                "debug"        : false
+            }
         };
 
         routes = [

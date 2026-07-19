@@ -13,9 +13,9 @@ component{
 	this.name              = hash( getCurrentTemplatePath() );
 	this.sessionManagement = true;
 	this.sessionTimeout    = createTimeSpan(0,0,15,0);
-    this.setClientCookies  = true;
+	this.setClientCookies  = true;
 
-    /**************************************
+	/**************************************
 	LUCEE Specific Settings
 	**************************************/
 	// buffer the output of a tag/function body to output in case of a exception
@@ -36,12 +36,15 @@ component{
 	// COLDBOX APPLICATION KEY OVERRIDE
 	COLDBOX_APP_KEY 		    = "";
 
-    // Mappings
+	// Normalize path for CommandBox, MiniServer, Docker (separators + trailing slash)
+	COLDBOX_APP_ROOT_PATH = normalizeDir( COLDBOX_APP_ROOT_PATH );
 	this.mappings[ "/root" ] = COLDBOX_APP_ROOT_PATH;
 
-	// Map back to its root
-	moduleRootPath 	= REReplaceNoCase( this.mappings[ "/root" ], "#request.MODULE_NAME#(\\|/)test-harness(\\|/)", "" );
-	modulePath 		= REReplaceNoCase( this.mappings[ "/root" ], "test-harness(\\|/)", "" );
+	// Derive module paths from {moduleRoot}/{moduleName}/test-harness/
+	// registerAndActivateModule( name, "moduleroot" ) resolves expandPath("/moduleroot") + "/" + name
+	// so /moduleroot must be the PARENT of the module folder (not "/" — expandPath breaks).
+	modulePath     = parentDir( COLDBOX_APP_ROOT_PATH ); // .../{moduleName}/
+	moduleRootPath = parentDir( modulePath );            // .../ (parent of module)
 
 	// Module Root + Path Mappings
 	this.mappings[ "/moduleroot" ] = moduleRootPath;
@@ -73,6 +76,40 @@ component{
 
 	public boolean function onMissingTemplate( template ){
 		return application.cbBootstrap.onMissingTemplate( argumentCollection=arguments );
+	}
+
+	/**
+	 * Forward slashes + trailing slash.
+	 */
+	private string function normalizeDir( required string path ) {
+		var p = replace( arguments.path, "\", "/", "all" );
+		// collapse duplicate slashes except leading //
+		p = reReplace( p, "([^:])//+", "\1/", "all" );
+		if ( !len( p ) ) {
+			return "/";
+		}
+		if ( right( p, 1 ) != "/" ) {
+			p &= "/";
+		}
+		return p;
+	}
+
+	/**
+	 * Parent directory with trailing slash. "/foo/bar/" → "/foo/"
+	 */
+	private string function parentDir( required string path ) {
+		var p = normalizeDir( arguments.path );
+		// strip trailing slash for list ops
+		p = reReplace( p, "/$", "" );
+		if ( !len( p ) || p == "" ) {
+			return "/";
+		}
+		var depth = listLen( p, "/" );
+		if ( depth <= 1 ) {
+			// "/cbwire" → parent is "/"
+			return "/";
+		}
+		return "/" & listDeleteAt( p, depth, "/" ) & "/";
 	}
 
 }

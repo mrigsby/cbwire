@@ -24,6 +24,9 @@ component accessors="true" singleton {
 	// Inject interceptorService
 	property name="interceptorService" inject="coldbox:interceptorService";
 
+	// WebSocket transport capability (soft SocketBox / host checks)
+	property name="transportCapabilityService" inject="provider:TransportCapabilityService@cbwire";
+
     function init() {
         // Initialize the array to store single file components
         variables._singleFileComponents = [];
@@ -498,6 +501,16 @@ component accessors="true" singleton {
             include "scripts.cfm";
         }
         return local.html;
+    }
+
+    /**
+     * Evaluate WebSocket transport availability for script injection.
+     * Used by scripts.cfm; safe when transport is disabled or unsupported.
+     *
+     * @return struct from TransportCapabilityService.evaluateTransport()
+     */
+    function getTransportEvaluation() {
+        return variables.transportCapabilityService.evaluateTransport();
     }
 
     /**

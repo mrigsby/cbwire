@@ -83,6 +83,9 @@ component{
 			"cbwire" = {
 				"autoInjectAssets"		: true,
 				"moduleRootURL": "/moduleroot/cbwire"
+				// transport.enabled defaults to false (module default). Specs that need
+				// WebSocket transport enable it and restore the original value.
+				// CommandBox web.websocket remains enabled so host is ready when tests opt in.
 			},
 			"cbi18n": {
 				// The default resource to load and aliased as `default`

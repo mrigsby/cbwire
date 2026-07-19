@@ -23,14 +23,29 @@ component{
 	// Create testing mapping
 	this.mappings[ "/tests" ] = getDirectoryFromPath( getCurrentTemplatePath() );
 
-	// The application root
-	rootPath = REReplaceNoCase( this.mappings[ "/tests" ], "tests(\\|/)", "" );
-	this.mappings[ "/root" ]   			= rootPath;
+	// Normalize separators + trailing slash (CommandBox and BoxLang MiniServer)
+	// (unscoped — component body; var is only valid inside functions)
+	testsPath = replace( this.mappings[ "/tests" ], "\", "/", "all" );
+	if ( right( testsPath, 1 ) != "/" ) {
+		testsPath &= "/";
+	}
+	this.mappings[ "/tests" ] = testsPath;
 
-	// The module root path
-	moduleRootPath = REReplaceNoCase( rootPath, "#request.MODULE_PATH#(\\|/)test-harness(\\|/)", "" );
-	this.mappings[ "/moduleroot" ] 				= moduleRootPath;
-	this.mappings[ "/#request.MODULE_NAME#" ] 	= moduleRootPath & "#request.MODULE_PATH#";
+	// The application root
+	rootPath = REReplaceNoCase( this.mappings[ "/tests" ], "tests(/|\\)?$", "" );
+	if ( right( rootPath, 1 ) != "/" ) {
+		rootPath &= "/";
+	}
+	this.mappings[ "/root" ] = rootPath;
+
+	// The module root path (optional trailing slash after test-harness)
+	moduleRootPath = REReplaceNoCase(
+		rootPath,
+		"#request.MODULE_PATH#(/|\\)test-harness(/|\\)?$",
+		""
+	);
+	this.mappings[ "/moduleroot" ] = moduleRootPath;
+	this.mappings[ "/#request.MODULE_NAME#" ] = moduleRootPath & request.MODULE_PATH;
 
 	// ORM Definitions
 	/**

@@ -76,6 +76,89 @@ component extends="coldbox.system.testing.BaseTestCase" {
                 expect( html ).toInclude( " data-no-progress-bar " );
             } );
 
+            it( "should not inject websocket transport script when transport.enabled is false", function() {
+                var CBWIREController = getInstance( "CBWIREController@cbwire" );
+                var settings = getInstance( "coldbox:modulesettings:cbwire" );
+                var originalTransport = duplicate( settings.transport ?: { enabled: false } );
+                settings.transport = { enabled: false };
+
+                try {
+                    var html = CBWIREController.getScripts();
+                    expect( html ).notToInclude( "cbwire-websocket-transport.js" );
+                    expect( html ).notToInclude( "__cbwireTransportConfig" );
+                } finally {
+                    settings.transport = originalTransport;
+                }
+            } );
+
+            it( "should inject websocket transport script before livewire when transport is effectively available", function() {
+                var CBWIREController = getInstance( "CBWIREController@cbwire" );
+                var settings = getInstance( "coldbox:modulesettings:cbwire" );
+                var originalTransport = duplicate( settings.transport ?: { enabled: false } );
+                settings.transport = { enabled: true, debug: true };
+
+                try {
+                    var capability = getInstance( "TransportCapabilityService@cbwire" );
+                    var evaluation = capability.evaluateTransport();
+                    var html = CBWIREController.getScripts();
+                    // Only assert injection when SocketBox + supported host are present
+                    if ( evaluation.available ) {
+                        expect( html ).toInclude( "cbwire-websocket-transport.js" );
+                        expect( html ).toInclude( "__cbwireTransportConfig" );
+                        expect( findNoCase( "cbwire-websocket-transport.js", html ) ).toBeLT(
+                            findNoCase( "livewire/dist/livewire.js", html )
+                        );
+                    } else {
+                        expect( html ).notToInclude( "cbwire-websocket-transport.js" );
+                    }
+                } finally {
+                    settings.transport = originalTransport;
+                }
+            } );
+
+            it( "should embed configured updateEndpoint in websocket transport config when available", function() {
+                var CBWIREController = getInstance( "CBWIREController@cbwire" );
+                var settings = getInstance( "coldbox:modulesettings:cbwire" );
+                var originalTransport = duplicate( settings.transport ?: { enabled: false } );
+                var hadUpdateEndpoint = settings.keyExists( "updateEndpoint" );
+                var originalUpdateEndpoint = hadUpdateEndpoint ? settings.updateEndpoint : "";
+                settings.transport = { enabled: true };
+                settings.updateEndpoint = "/index.cfm/cbwire/update";
+
+                try {
+                    var capability = getInstance( "TransportCapabilityService@cbwire" );
+                    var html = CBWIREController.getScripts();
+                    if ( capability.isEffectivelyAvailable() ) {
+                        expect( html ).toInclude( "/index.cfm/cbwire/update" );
+                    }
+                } finally {
+                    settings.transport = originalTransport;
+                    if ( hadUpdateEndpoint ) {
+                        settings.updateEndpoint = originalUpdateEndpoint;
+                    } else {
+                        structDelete( settings, "updateEndpoint" );
+                    }
+                }
+            } );
+
+            it( "should report transport evaluation shape when transport is enabled", function() {
+                var settings = getInstance( "coldbox:modulesettings:cbwire" );
+                var originalTransport = duplicate( settings.transport ?: { enabled: false } );
+                settings.transport = { enabled: true };
+
+                try {
+                    var capability = getInstance( "TransportCapabilityService@cbwire" );
+                    var evaluation = capability.evaluateTransport();
+                    expect( evaluation.enabled ).toBeTrue();
+                    // available depends on host + SocketBox; struct shape is always present
+                    expect( evaluation ).toHaveKey( "available" );
+                    expect( evaluation ).toHaveKey( "reasons" );
+                    expect( evaluation ).toHaveKey( "clientConfig" );
+                } finally {
+                    settings.transport = originalTransport;
+                }
+            } );
+
             it( "should have default updateEndpoint", function() {
                 var CBWIREController = getInstance( "CBWIREController@cbwire" );
                 var settings = getInstance( "coldbox:modulesettings:cbwire" );

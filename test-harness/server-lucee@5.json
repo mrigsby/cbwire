@@ -15,6 +15,11 @@
         "aliases":{
             "/modules/cbwire":"../",
             "/moduleroot/cbwire":"../"
+        },
+        "websocket":{
+            "enable":true,
+            "uri":"/ws",
+            "listener":"/WebSocket.cfc"
         }
     },
     "openBrowser":"false"
