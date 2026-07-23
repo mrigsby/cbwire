@@ -78,7 +78,25 @@ component {
              * You can also provide your own custom implementation that implements
              * cbwire.models.interfaces.ICSRFStorage
              */
-            "csrfService": "SessionCSRFStorage@cbwire"
+            "csrfService": "SessionCSRFStorage@cbwire",
+            /**
+             * Custom client and server error handling for Livewire update requests.
+             * Master switch is "enabled". Wires may set customErrorHandling = true|false
+             * to override the master switch for that component.
+             *
+             * clientEnabled / serverEnabled gate each layer when the feature is on
+             * for a request (via module enabled or per-wire override).
+             */
+            "customErrorHandling": {
+                "enabled"            : false,
+                "clientEnabled"      : true,
+                "serverEnabled"      : true,
+                "includeComponents"  : true,
+                "includeDetailInDev" : false,
+                "warnIfUnhandled"    : true,
+                "includeMessage"     : true,
+                "genericMessage"     : "An error occurred while processing the request."
+            }
         };
 
         routes = [
@@ -111,7 +129,9 @@ component {
 				"onCBWIRERender",
 				"preCBWIREUpdate",
 				"onCBWIREUpdate",
-				"onCBWIRESecureFail"
+				"onCBWIRESecureFail",
+				// Fires when compact server error JSON is about to be returned for /cbwire/update
+				"onCBWIREUpdateError"
 			]
         };
     }

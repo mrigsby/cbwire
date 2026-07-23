@@ -1634,7 +1634,7 @@ component output="true" accessors="true" {
      * @return struct
      */
     function _getMemo(){
-        return [
+        local.memo = [
             "id": variables._id,
             "name": _getComponentName(),
             "path": _getComponentName(),
@@ -1647,7 +1647,14 @@ component output="true" accessors="true" {
             "lazyIsolated": true,
             "errors":[],
             "locale":"en"
-        ]
+        ];
+
+        // Optional per-wire override for custom error handling (boolean only)
+        if ( variables.keyExists( "customErrorHandling" ) && isBoolean( variables.customErrorHandling ) ) {
+            local.memo[ "customErrorHandling" ] = variables.customErrorHandling ? true : false;
+        }
+
+        return local.memo;
     }
 
     /**

@@ -494,6 +494,11 @@ component accessors="true" singleton {
      * @return string
      */
     function getScripts() {
+        // Client error-handling config for scripts.cfm (always injected; respects overrides)
+        local.cehService = variables.wirebox.getInstance( "CustomErrorHandlingService@cbwire" );
+        local.cehClientConfig = local.cehService.getClientScriptConfig();
+        local.cehInjectClient = local.cehService.shouldInjectClientScript();
+
         savecontent variable="local.html" {
             include "scripts.cfm";
         }

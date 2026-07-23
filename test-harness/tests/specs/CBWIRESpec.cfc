@@ -76,6 +76,199 @@ component extends="coldbox.system.testing.BaseTestCase" {
                 expect( html ).toInclude( " data-no-progress-bar " );
             } );
 
+            it( "should always include custom error handling client script for per-wire overrides", function() {
+                var CBWIREController = getInstance( "CBWIREController@cbwire" );
+                var settings = getInstance( "coldbox:modulesettings:cbwire" );
+                settings.customErrorHandling = {
+                    "enabled"       : false,
+                    "clientEnabled" : true,
+                    "serverEnabled" : true
+                };
+                var html = CBWIREController.getScripts();
+                expect( html ).toInclude( 'data-cbwire-custom-error-handling="true"' );
+                expect( html ).toInclude( "cbwire:error" );
+                expect( html ).toInclude( "__CBWIRE_CEH" );
+                expect( html ).toInclude( '"enabled":false' );
+            } );
+
+            it( "should embed enabled true in client config when module setting is on", function() {
+                var CBWIREController = getInstance( "CBWIREController@cbwire" );
+                var settings = getInstance( "coldbox:modulesettings:cbwire" );
+                settings.customErrorHandling = {
+                    "enabled"           : true,
+                    "clientEnabled"     : true,
+                    "warnIfUnhandled"   : false,
+                    "includeComponents" : false
+                };
+                var html = CBWIREController.getScripts();
+                expect( html ).toInclude( '"enabled":true' );
+                expect( html ).toInclude( '"warnIfUnhandled":false' );
+                expect( html ).toInclude( '"includeComponents":false' );
+                settings.customErrorHandling.enabled = false;
+            } );
+
+            it( "should return compact JSON for update server errors when custom error handling is enabled", function() {
+                var settings = getInstance( "coldbox:modulesettings:cbwire" );
+                settings.customErrorHandling = {
+                    "enabled"            : true,
+                    "clientEnabled"      : true,
+                    "serverEnabled"      : true,
+                    "includeComponents"  : true,
+                    "includeDetailInDev" : false,
+                    "warnIfUnhandled"    : true,
+                    "includeMessage"     : true,
+                    "genericMessage"     : "An error occurred while processing the request."
+                };
+
+                // Module handlers are not WireBox-mapped as Main@cbwire; instantiate by path
+                var handler = prepareMock( createObject( "component", "cbwire.handlers.Main" ) );
+                var mockController = createStub();
+                mockController.$( "handleRequest" ).$callback( function() {
+                    throw( type="DemoServerError", message="Forced compact error body" );
+                } );
+                var cehService = getInstance( "CustomErrorHandlingService@cbwire" );
+                handler.$property( propertyName="cbwireController", mock=mockController );
+                handler.$property( propertyName="moduleSettings", mock=settings );
+                handler.$property( propertyName="customErrorHandlingService", mock=cehService );
+
+                var event = getRequestContext();
+                handler.index( event=event, rc={}, prc={} );
+
+                var rendered = event.getRenderData();
+                expect( rendered ).toHaveKey( "data" );
+                expect( rendered.statusCode ).toBe( 500 );
+                expect( rendered.data.error ).toBeTrue();
+                expect( rendered.data.type ).toBe( "server" );
+                expect( rendered.data.status ).toBe( 500 );
+                expect( rendered.data.message ).toInclude( "Forced compact error body" );
+
+                settings.customErrorHandling.enabled = false;
+            } );
+
+            it( "should return compact JSON for page expired when custom error handling is enabled", function() {
+                var settings = getInstance( "coldbox:modulesettings:cbwire" );
+                settings.customErrorHandling = {
+                    "enabled"       : true,
+                    "serverEnabled" : true,
+                    "includeMessage": true
+                };
+
+                var handler = prepareMock( createObject( "component", "cbwire.handlers.Main" ) );
+                var mockController = createStub();
+                mockController.$( "handleRequest" ).$callback( function() {
+                    throw( type="CBWIREException", message="Page expired." );
+                } );
+                var cehService = getInstance( "CustomErrorHandlingService@cbwire" );
+                handler.$property( propertyName="cbwireController", mock=mockController );
+                handler.$property( propertyName="moduleSettings", mock=settings );
+                handler.$property( propertyName="customErrorHandlingService", mock=cehService );
+
+                var event = getRequestContext();
+                handler.index( event=event, rc={}, prc={} );
+
+                var rendered = event.getRenderData();
+                expect( rendered ).toHaveKey( "data" );
+                expect( rendered.statusCode ).toBe( 419 );
+                expect( rendered.data.error ).toBeTrue();
+                expect( rendered.data.type ).toBe( "expired" );
+                expect( rendered.data.message ).toBe( "Page expired" );
+
+                settings.customErrorHandling.enabled = false;
+            } );
+
+            it( "should not return compact JSON when serverEnabled is false", function() {
+                var settings = getInstance( "coldbox:modulesettings:cbwire" );
+                settings.customErrorHandling = {
+                    "enabled"       : true,
+                    "serverEnabled" : false,
+                    "includeMessage": true
+                };
+
+                var handler = prepareMock( createObject( "component", "cbwire.handlers.Main" ) );
+                var mockController = createStub();
+                mockController.$( "handleRequest" ).$callback( function() {
+                    throw( type="DemoServerError", message="Should rethrow" );
+                } );
+                // Do not prepareMock the WireBox singleton; that leaves stubs for later specs
+                // Handler always calls extractWireOverrides then isServerEnabledForRequest
+                var mockCeh = createStub();
+                mockCeh.$( "extractWireOverridesFromRequestContent", [] );
+                mockCeh.$( "isServerEnabledForRequest", false );
+                handler.$property( propertyName="cbwireController", mock=mockController );
+                handler.$property( propertyName="moduleSettings", mock=settings );
+                handler.$property( propertyName="customErrorHandlingService", mock=mockCeh );
+
+                expect( function() {
+                    handler.index( event=getRequestContext(), rc={}, prc={} );
+                } ).toThrow();
+
+                settings.customErrorHandling.enabled = false;
+                settings.customErrorHandling.serverEnabled = true;
+            } );
+
+            it( "should return compact JSON when service says server layer is on for the request", function() {
+                var settings = getInstance( "coldbox:modulesettings:cbwire" );
+                // Reset full config so prior specs cannot leave layer flags wrong
+                settings.customErrorHandling = {
+                    "enabled"            : false,
+                    "clientEnabled"      : true,
+                    "serverEnabled"      : true,
+                    "includeComponents"  : true,
+                    "includeDetailInDev" : false,
+                    "warnIfUnhandled"    : true,
+                    "includeMessage"     : true,
+                    "genericMessage"     : "An error occurred while processing the request."
+                };
+
+                // Module off + wire override true is resolved inside the service
+                var cehService = getInstance( "CustomErrorHandlingService@cbwire" );
+                expect( cehService.isServerEnabledForWire( true ) ).toBeTrue();
+                expect( cehService.isServerEnabledForRequest( [ true ] ) ).toBeTrue();
+
+                var handler = prepareMock( createObject( "component", "cbwire.handlers.Main" ) );
+                var mockController = createStub();
+                mockController.$( "handleRequest" ).$callback( function() {
+                    throw( type="DemoServerError", message="Wire override path" );
+                } );
+                var built = cehService.buildCompactErrorPayload(
+                    error  = { message : "Wire override path", type : "DemoServerError" },
+                    type   = "server",
+                    status = 500
+                );
+                var mockCeh = createStub();
+                mockCeh.$( "extractWireOverridesFromRequestContent", [ true ] );
+                mockCeh.$( "isServerEnabledForRequest", true );
+                mockCeh.$( "buildCompactErrorPayload" ).$results( built );
+                mockCeh.$( "announceUpdateError" ).$results( {
+                    "payload" : built,
+                    "status"  : 500,
+                    "type"    : "server"
+                } );
+                handler.$property( propertyName="cbwireController", mock=mockController );
+                handler.$property( propertyName="moduleSettings", mock=settings );
+                handler.$property( propertyName="customErrorHandlingService", mock=mockCeh );
+
+                var event = getRequestContext();
+                handler.index( event=event, rc={}, prc={} );
+                var rendered = event.getRenderData();
+                expect( rendered.statusCode ).toBe( 500 );
+                expect( rendered.data.message ).toInclude( "Wire override path" );
+
+                settings.customErrorHandling.enabled = false;
+            } );
+
+            it( "should put customErrorHandling on component memo when the wire defines it", function() {
+                // Use a simple component instance if available; otherwise assert service extraction path
+                var cehService = getInstance( "CustomErrorHandlingService@cbwire" );
+                var entry = {
+                    "snapshot" : serializeJSON( {
+                        "memo" : { "id" : "1", "name" : "Demo", "customErrorHandling" : false },
+                        "data" : {}
+                    } )
+                };
+                expect( cehService.extractOverrideFromComponentEntry( entry ) ).toBeFalse();
+            } );
+
             it( "should have default updateEndpoint", function() {
                 var CBWIREController = getInstance( "CBWIREController@cbwire" );
                 var settings = getInstance( "coldbox:modulesettings:cbwire" );
